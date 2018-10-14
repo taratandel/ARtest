@@ -13,7 +13,7 @@ class ViewController: UIViewController {
     @IBOutlet weak var sceneView: ARSCNView!
     override func viewDidLoad() {
         super.viewDidLoad()
-        addBox()
+        addBoxes()
         addTapGestureToSceneView()
         // Do any additional setup after loading the view, typically from a nib.
     }
@@ -45,20 +45,43 @@ class ViewController: UIViewController {
         scene.rootNode.addChildNode(boxNode)
         sceneView.scene = scene
     }
+    func addBoxes(x: Float = 0, y: Float = 0, z: Float = -0.2) {
+        let box = SCNBox(width: 0.1, height: 0.1, length: 0.1, chamferRadius: 0)
+        
+        let boxNode = SCNNode()
+        boxNode.geometry = box
+        boxNode.position = SCNVector3(x, y, z)
+        
+        sceneView.scene.rootNode.addChildNode(boxNode)
+    }
     
     func addTapGestureToSceneView() {
         let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(ViewController.didTap(withGestureRecognizer:)))
         sceneView.addGestureRecognizer(tapGestureRecognizer)
     }
     
-    @objc
-    func didTap(withGestureRecognizer recognizer: UIGestureRecognizer) {
-        // We retrieve the user’s tap location relative to the sceneView and hit test to see if we tap onto any node(s).
+    @objc func didTap(withGestureRecognizer recognizer: UIGestureRecognizer) {
+        //First, we perform a hit test we specify a .featurePoint result type for the types parameter. The types parameter asks the hit test to search for real-world objects or surfaces detected through the AR session’s processing of the camera image. There are many types of the result type. However, we will focus on just the feature point in this tutorial.
         let tapLocation = recognizer.location(in: sceneView)
         let hitTestResults = sceneView.hitTest(tapLocation)
-        // Afterward, we safely unwrap the first node from our hitTestResults. If the result does contain at least a node, we will remove the first node we tapped on from its parent node.
-        guard let node = hitTestResults.first?.node else { return }
+        // beacuse ARKit may not always detect a real world object or a surface in the real world.
+        guard let node = hitTestResults.first?.node else {
+            let hitTestResultsWithFeaturePoints = sceneView.hitTest(tapLocation, types: .featurePoint)
+            if let hitTestResultWithFeaturePoints = hitTestResultsWithFeaturePoints.first {
+                // we transform the matrix of type matrix_float4x4 to float3
+                let translation = hitTestResultWithFeaturePoints.worldTransform.translation
+                addBoxes(x: translation.x, y: translation.y, z: translation.z)
+            }
+            return
+        }
         node.removeFromParentNode()
     }
 }
-
+// the Geometric calculations I dont understande :\
+extension float4x4 {
+    // This extension basically transforms a matrix into float3. It gives us the x, y, and z from the matrix.
+    var translation: float3 {
+        let translation = self.columns.3
+        return float3(translation.x, translation.y, translation.z)
+    }
+}
